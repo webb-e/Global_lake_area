@@ -1,5 +1,4 @@
-# Global_lake_area
-Companion code to the paper *Seminal global surface water datasets are temporally biased* 
+## Companion code to the paper *Seminal global surface water datasets are temporally biased* 
 
 This repository is organized into folders as follows:
 
