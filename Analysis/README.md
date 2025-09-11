@@ -4,7 +4,7 @@
 
 `wet_dry.R` culsters months into wet and dry categories for each lake
 
-###need to add 
+## need to add 
 `full_base_models.R` estimates area trends for individual lakes accounting for bias and not accounting for bias
 `full_vs_basemodel.py` takes the trend estimates and counts the number of lakes with positive/negative trends using the models accounting for and not accounting for bias. This file also outputs the shapefile used to generate figue 2.
 `breakpoint.R` determines which years lakes experience structural changes in their time series.
