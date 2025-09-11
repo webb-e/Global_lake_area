@@ -16,3 +16,5 @@ This repository is organized into folders as follows:
 * perform the breakpoint analysis
 
 `Figures` contains the code used to produce the figures
+
+The lake area timeseries, annual medians, and monthly medians are archived through the Arctic Data Center ## here.
