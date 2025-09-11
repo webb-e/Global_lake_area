@@ -12,8 +12,8 @@ library(dplyr)
 ### Files to be processed
 #########
 # Set path to parquet files and output dataset directory
-parquet_path <- "/Users/elizabethwebb/Library/CloudStorage/GoogleDrive-webb.elizabeth.e@gmail.com/My Drive/PostDoc/Landsat8/lake_area_parquets/"
-output_dir <- "/Users/elizabethwebb/Library/CloudStorage/GoogleDrive-webb.elizabeth.e@gmail.com/My Drive/PostDoc/Landsat8/seasonal_dataset"
+parquet_path <- "..../lake_area_parquets/"
+output_dir <- ".../seasonal_dataset"
 
 # create directory
 dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
@@ -23,7 +23,7 @@ parquet_files <- list.files(parquet_path, pattern = "\\.parquet$", full.names = 
 parquet_files <- parquet_files[!grepl("lake_group=000", parquet_files)]
 
 ## climate_zone data
-climate_data <- fread('/Users/elizabethwebb/Library/CloudStorage/GoogleDrive-webb.elizabeth.e@gmail.com/My Drive/PostDoc/Landsat_observations/csv_lists/lake_climate_match.csv')
+climate_data <- fread('.../lake_climate_match.csv')
 climate_data[, lake_id := as.character(lake_id)]
 
 ########
