@@ -4,4 +4,4 @@
 
 `create_annual_medians_dataset.R` uses the lake area timeseries to calculate annual median area for each lake
 
-`create_monthly_medians_dataset.R` uses the lake area timeseries to calculate montnly median area for each lake
+`create_monthly_medians_dataset.R` uses the lake area timeseries to calculate monthly median area for each lake
