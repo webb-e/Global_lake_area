@@ -13,8 +13,8 @@ library(strucchange)
 #==========================
 # === PATHS ===
 #==========================
-parquet_path <- '/Users/elizabethwebb/Library/CloudStorage/GoogleDrive-webb.elizabeth.e@gmail.com/My Drive/PostDoc/Landsat8/annual_lake_medians_dataset'
-output_dir   <- "/Users/elizabethwebb/Library/CloudStorage/GoogleDrive-webb.elizabeth.e@gmail.com/My Drive/PostDoc/Landsat8/breakpoint_dataset"
+parquet_path <- '.../annual_lake_medians_dataset'
+output_dir   <- ".../breakpoint_dataset"
 
 # Create output directory
 dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
