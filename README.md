@@ -1,4 +1,4 @@
-## Companion code to the paper *Seminal global surface water datasets are temporally biased* 
+## Companion code to the paper *Temporal bias in Landsat-derived surface water trends* 
 
 This repository is organized into folders as follows:
 
