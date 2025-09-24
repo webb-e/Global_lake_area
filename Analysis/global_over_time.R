@@ -177,7 +177,7 @@ glad_dt[, uniqueN(lake_id)]
 
 
 #==========================
-# ===== Generate Table 1
+# ===== Generate ED Table 2
 #==========================
 #####   the total, mean, and median lake area were strongly correlated with observation frequency
 
@@ -239,7 +239,7 @@ correlation_table <- results_df %>%
 
 
 #==========================
-# ===== Generate Table 2
+# ===== Generate ED Table 1
 #==========================
 ###   Total, mean, and median global lake area derived from the GSWO and GLAD
 ###   surface water products increased over the 23-year record 
