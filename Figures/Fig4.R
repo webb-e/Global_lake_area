@@ -8,8 +8,8 @@ library(tidyverse)
 ### READ IN DATA AND DEAL WITH PROJECTIONS
 ########
 
-GSWOdata<-st_read('/Users/elizabethwebb/Library/CloudStorage/GoogleDrive-webb.elizabeth.e@gmail.com/My Drive/PostDoc/Landsat8/shapefiles/L8_trends_withwithout_100KM_GSWO.shp')
-GLADdata<-st_read('/Users/elizabethwebb/Library/CloudStorage/GoogleDrive-webb.elizabeth.e@gmail.com/My Drive/PostDoc/Landsat8/shapefiles/L8_trends_withwithout_100KM_GLAD.shp')
+GSWOdata<-st_read('.../L8_trends_withwithout_100KM_GSWO.shp')
+GLADdata<-st_read('.../L8_trends_withwithout_100KM_GLAD.shp')
 
 # earth background
 land <- ne_download(scale = "medium", type = "land", category = "physical", returnclass = "sf")
@@ -171,7 +171,7 @@ both_plots<-plot_grid(top_plot,NULL, bottom_plot, rel_heights = c(2,-0.425,1.2),
 ggsave("Fig2_trendmap_100km.jpg", both_plots,  width=580, height=460, 
        units="mm",  dpi=500, scale=2.5,
        limitsize = FALSE,
-       path='/Users/elizabethwebb/Library/CloudStorage/GoogleDrive-webb.elizabeth.e@gmail.com/My Drive/PostDoc/Landsat8/figures') 
+       path='.../figures') 
 
 
 
