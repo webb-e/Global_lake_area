@@ -16,7 +16,7 @@ library(patchwork)
 # ===== read in files
 #==========================
 # Set the file path
-parquet_path <- "/Users/elizabethwebb/Library/CloudStorage/GoogleDrive-webb.elizabeth.e@gmail.com/My Drive/PostDoc/Landsat8/annual_lake_medians_dataset/"  
+parquet_path <- ".../annual_lake_medians_dataset/"  
 parquet_files <- list.files(parquet_path, pattern = "\\.parquet$", full.names = TRUE, recursive = TRUE)
 
 #########
