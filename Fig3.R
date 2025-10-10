@@ -5,7 +5,7 @@ library(tidyverse)
 # ===== read in files
 #==========================
 # folder with parquet files
-breakpoint_folder <- "/Users/elizabethwebb/Library/CloudStorage/GoogleDrive-webb.elizabeth.e@gmail.com/My Drive/PostDoc/Landsat8/breakpoint_dataset"
+breakpoint_folder <- ".../breakpoint_dataset"
 
 # list all parquet files
 parquet_files <- list.files(breakpoint_folder, pattern = "\\.parquet$", full.names = TRUE)
@@ -15,7 +15,7 @@ breakpoints_dt <- rbindlist(lapply(parquet_files, read_parquet), use.names = TRU
 setDT(breakpoints_dt)
 
 ## climate zone data
-climatedata<-fread('/Users/elizabethwebb/Library/CloudStorage/GoogleDrive-webb.elizabeth.e@gmail.com/My Drive/PostDoc/Landsat_observations/csv_lists/lake_climate_match.csv')
+climatedata<-fread('.../lake_climate_match.csv')
 ## get lake_id in the right format
 climatedata$lake_id<-as.character(round(climatedata$lake_id))
 
@@ -106,5 +106,5 @@ plot_highlight<-ggplot(plot_data, aes(x = year, y = percent, fill=dataset,  alph
 
 #### SAVE!
 ggsave("Fig3_breakpointV2.jpg", plot_highlight,  width=400, height=400,units="mm", scale=1, dpi=500,
-       path='/Users/elizabethwebb/Library/CloudStorage/GoogleDrive-webb.elizabeth.e@gmail.com/My Drive/PostDoc/Landsat8/figures')
+       path='.../figures')
 
