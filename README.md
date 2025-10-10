@@ -1,3 +1,4 @@
+Code to accopany the paper <i>Temporal bias in Landsat-derived surface water trends</i>
 
 This repository is organized into folders as follows:
 
