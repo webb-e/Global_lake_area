@@ -17,4 +17,4 @@ This repository is organized into folders as follows:
 
 `Figures` contains the code used to produce the figures
 
-The lake area timeseries, annual medians, and monthly medians are archived through the Arctic Data Center: [doi:10.18739/A2BZ61B03](doi:10.18739/A2BZ61B03).
+The lake area timeseries, annual medians, and monthly medians are archived through the Arctic Data Center:[doi:10.18739/A2BZ61B03](doi:10.18739/A2BZ61B03).
