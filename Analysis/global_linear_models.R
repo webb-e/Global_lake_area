@@ -1,376 +1,199 @@
 #############
-### This code takes the global total, mean, and median annual lake areas 
-### and relates them to observation frequency, year, and pre/post Landsat-8
-###     The first section is data wangling and summary stats.
-###   The second section is model selection - using AIC to determine the best model
-###   The third section takes the best models and makes a table for export
-###   The last section specifies models with a year coefficient and tests for statistical significance
-### Last updated on July 25, 2025 by E.Webb
-#############
+### Linear models relating global total, mean, and median annual lake area to observation
+### frequency and year
+###
+### Observation frequency is represented three ways (n_obs_sum, n_obs_mean,
+### n_obs_median), entered one at a time as alternative models.
+### For each annually aggregated response the code tries
+### combination (3 obs variants x {no year, +year} = 6 models) and selects the
+### model with the lowest AIC, repeating for each dataset. 
+### Each response x dataset is fit twice:
+###   (a) all lakes
+###   (b) complete-record lakes: lakes with >= 1 observation in EVERY year.
+###
+### Output: summary table with terms (Observation frequency / Year / Entire model) as rows 
+### and metrics (coefficient / 95% CI / r-squared / p-value) as columns
+###
+### Last updated July 2026 by E.Webb
 
+#############
 library(arrow)
 library(tidyverse)
 library(data.table)
 library(relaimpo)
 
+id_col <- "lake_id"   # per-lake identifier in the parquet
 #==========================
-# ===== read in files
+# ===== read in files 
 #==========================
-# Set the file path
-parquet_path <- "....annual_lake_medians_dataset/"  
-parquet_files <- list.files(parquet_path, pattern = "\\.parquet$", full.names = TRUE, recursive = TRUE)
+parquet_path <- 'annual_lake_medians_dataset'
+parquet_files <- list.files(parquet_path, pattern = "\\.parquet$",
+                            full.names = TRUE, recursive = TRUE)
+read_raw <- function(path, ds_name) {
+  open_dataset(path) %>%
+    filter(dataset == ds_name) %>%
+    dplyr::select(all_of(c(id_col, "dataset", "year", "n_obs", "median_water"))) %>%
+    collect() %>% as.data.table()
+}
 
-#########
-## Read in GSWO data
-#########
-read_filtered <- function(path) {
-  ds <- open_dataset(path)
-  filtered <- ds %>%
-    filter(dataset == "GSWO") %>%
-    collect()
-  as.data.table(filtered)}
+annual_summary <- function(dt) {
+  out <- dt[, .(
+    median_water_median = median(median_water, na.rm = TRUE),
+    median_water_mean   = mean(median_water,   na.rm = TRUE),
+    median_water_sum    = sum(median_water,    na.rm = TRUE),
+    n_obs_median        = median(n_obs, na.rm = TRUE),
+    n_obs_mean          = mean(n_obs,   na.rm = TRUE),
+    n_obs_sum           = sum(n_obs,    na.rm = TRUE)), by = .(dataset, year)]
+  out[, `:=`(total_lake_area  = median_water_sum    / 1e6,   # km2
+             mean_lake_area   = median_water_mean   / 1e6,
+             median_lake_area = median_water_median / 1e6)]
+  out[]
+}
+# lakes observed (n_obs >= 1) in every year of the record
+subset_complete <- function(dt) {
+  n_years <- uniqueN(dt$year)
+  cnt  <- dt[n_obs > 0, .(nyr = uniqueN(year)), by = c(id_col)]
+  keep <- cnt[nyr == n_years][[id_col]]
+  dt[get(id_col) %in% keep]
+}
+gswo_raw <- rbindlist(lapply(parquet_files, read_raw, ds_name = "GSWO"),
+                      use.names = TRUE, fill = TRUE)
+glad_raw <- rbindlist(lapply(parquet_files, read_raw, ds_name = "GLAD"),
+                      use.names = TRUE, fill = TRUE)
+gswo_c_raw <- subset_complete(gswo_raw)
+glad_c_raw <- subset_complete(glad_raw)
 
-gswo_dt <- rbindlist(lapply(parquet_files, read_filtered), use.names = TRUE, fill = TRUE)
-
-#########
-## Read in GLAD data
-#########
-read_filtered_GLAD <- function(path) {
-  ds <- open_dataset(path)
-  filtered <- ds %>%
-    filter(dataset == "GLAD") %>%
-    collect()
-  as.data.table(filtered)}
-
-glad_dt <- rbindlist(lapply(parquet_files, read_filtered_GLAD), use.names = TRUE, fill = TRUE)
-
-#==========================
-# ===== summary stats
-#=========================
-
-#########
-##  summary GSWO 
-#########
-
-### Global summary (across all climate zones)
-gswo <- gswo_dt[, .(
-  median_water_median = median(median_water, na.rm = TRUE),
-  median_water_mean   = mean(median_water, na.rm = TRUE),
-  median_water_sum    = sum(median_water, na.rm = TRUE),
-  n_obs_median        = median(n_obs, na.rm = TRUE),
-  n_obs_mean          = mean(n_obs, na.rm = TRUE),
-  n_obs_sum           = sum(n_obs, na.rm = TRUE)), by = .(dataset, year)][, climate_zone := "Global"]
-
-
-#########
-##  summary GLAD 
-#########
-
-### Global summary (across all climate zones)
-glad <- glad_dt[, .(
-  median_water_median = median(median_water, na.rm = TRUE),
-  median_water_mean   = mean(median_water, na.rm = TRUE),
-  median_water_sum    = sum(median_water, na.rm = TRUE),
-  n_obs_median        = median(n_obs, na.rm = TRUE),
-  n_obs_mean          = mean(n_obs, na.rm = TRUE),
-  n_obs_sum           = sum(n_obs, na.rm = TRUE)), by = .(dataset, year)][, climate_zone := "Global"]
-
-#### get area in km2
-gswo[, total_lake_area := median_water_sum / 1e6]
-gswo[, median_lake_area := median_water_median / 1e6]
-gswo[, mean_lake_area := median_water_mean / 1e6]
-
-glad[, total_lake_area := median_water_sum / 1e6]
-glad[, median_lake_area := median_water_median / 1e6]
-glad[, mean_lake_area := median_water_mean / 1e6]
-
-## add in column for Landsat-8
-gswo$l8 <-ifelse(gswo$year<2013, 0, 1)
-glad$l8 <-ifelse(glad$year<2013, 0, 1)
+# annual summaries: full and complete-record subset
+gswo   <- annual_summary(gswo_raw);   glad   <- annual_summary(glad_raw)
+gswo_c <- annual_summary(gswo_c_raw); glad_c <- annual_summary(glad_c_raw)
 
 #==========================
-# ===== which models are better - test to see contributions to increasing lake area
+# ===== model selection: all-subsets AIC
 #==========================
-########
-## TOTAL LAKE AREA
-#######
-## GSWO
-model1_GSWO<- lm(total_lake_area ~ n_obs_sum + year + l8, data=gswo)
-model2_GSWO<- lm(total_lake_area ~ n_obs_sum + l8, data=gswo)
-model3_GSWO<- lm(total_lake_area ~ n_obs_sum + year, data=gswo)
-model4_GSWO<- lm(total_lake_area ~ l8 + year, data=gswo)
-
-AIC(model1_GSWO, model2_GSWO, model3_GSWO, model4_GSWO)
-## model 2 has lowest AIC 
-anova(model1_GSWO, model2_GSWO) # p =0.6715
-anova(model1_GSWO, model3_GSWO) # p = 0.09499
-## model 2 is not statistically significantly better than model 1; either model 1 or model 2 works,
-## but using the l8 step change (model 2) is better using  year (model 3).
-
-## GLAD
-
-model1_GLAD<- lm(total_lake_area ~ n_obs_sum + year + l8, data=glad)
-model2_GLAD<- lm(total_lake_area ~ n_obs_sum + l8, data=glad)
-model3_GLAD<- lm(total_lake_area ~ n_obs_sum + year, data=glad)
-model4_GLAD<- lm(total_lake_area ~ l8 + year, data=glad)
-
-AIC(model1_GLAD, model2_GLAD, model3_GLAD, model4_GLAD)
-## model 1 has lowest AIC 
-anova(model1_GLAD, model2_GLAD) 
-anova(model1_GLAD, model3_GLAD) 
-## model 1 is not statistically significantly better than model 2; either model 1 or model 2 works,
-## but using the l8 step change (model 2) is better using  year (model 3).
-
-########
-## MEAN LAKE AREA
-#######
-mean0_GSWO<- lm(mean_lake_area ~ n_obs_mean, data=gswo)
-mean1_GSWO<- lm(mean_lake_area ~ n_obs_mean + year + l8, data=gswo)
-mean2_GSWO<- lm(mean_lake_area ~ n_obs_mean + l8, data=gswo)
-mean3_GSWO<- lm(mean_lake_area ~ n_obs_mean + year, data=gswo)
-mean4_GSWO<- lm(mean_lake_area ~ l8 + year, data=gswo)
-mean5_GSWO<- lm(mean_lake_area ~ l8, data=gswo)
-mean6_GSWO<- lm(mean_lake_area ~ n_obs_sum + year + l8, data=gswo)
-mean7_GSWO<- lm(mean_lake_area ~ n_obs_sum + l8, data=gswo)
-mean8_GSWO<- lm(mean_lake_area ~ n_obs_sum + year, data=gswo)
-mean9_GSWO<- lm(mean_lake_area ~ l8 + year, data=gswo)
-mean10_GSWO<- lm(mean_lake_area ~ l8, data=gswo)
-
-GSWO_mean_table <- AIC(mean0_GSWO,mean1_GSWO, mean2_GSWO, mean3_GSWO, mean4_GSWO,
-                       mean5_GSWO, mean6_GSWO, mean7_GSWO, mean8_GSWO,
-                       mean9_GSWO, mean10_GSWO)
-
-GSWO_mean_table[order(GSWO_mean_table$AIC), ]
-
-## mean2_GSWO has best AIC, mean3_GSWO is nearly the same
-
-####GLAD
-mean0_GLAD<- lm(mean_lake_area ~ n_obs_mean, data=glad)
-mean1_GLAD<- lm(mean_lake_area ~ n_obs_sum + year + l8, data=glad)
-mean2_GLAD<- lm(mean_lake_area ~ n_obs_sum + l8, data=glad)
-mean3_GLAD<- lm(mean_lake_area ~ n_obs_sum + year, data=glad)
-mean4_GLAD<- lm(mean_lake_area ~ l8 + year, data=glad)
-
-AIC(mean0_GLAD,mean1_GLAD, mean2_GLAD, mean3_GLAD, mean4_GLAD)
-## mean 1 has lowest AIC 
-anova(mean1_GLAD, mean2_GLAD) # p =0.01914
-
-## mean 1 is  statistically significantly better than mean 2;
-
-########
-## MEDIAN LAKE AREA
-#######
-median0_GSWO<- lm(median_lake_area ~ n_obs_median , data=gswo)
-median1_GSWO<- lm(median_lake_area ~ n_obs_median + year + l8, data=gswo)
-median2_GSWO<- lm(median_lake_area ~ n_obs_median + l8, data=gswo)
-median3_GSWO<- lm(median_lake_area ~ n_obs_median + year, data=gswo)
-median4_GSWO<- lm(median_lake_area ~ l8 + year, data=gswo)
-median5_GSWO<- lm(median_lake_area ~ l8, data=gswo)
-median6_GSWO<- lm(median_lake_area ~ n_obs_sum + year + l8, data=gswo)
-median7_GSWO<- lm(median_lake_area ~ n_obs_sum + l8, data=gswo)
-median8_GSWO<- lm(median_lake_area ~ n_obs_sum + year, data=gswo)
-median9_GSWO<- lm(median_lake_area ~ l8 + year, data=gswo)
-median10_GSWO<- lm(median_lake_area ~ l8, data=gswo)
-median11_GSWO<- lm(median_lake_area ~ n_obs_sum, data=gswo)
-
-
-GSWO_median_table <- AIC(median0_GSWO, median1_GSWO, median2_GSWO, median3_GSWO, median4_GSWO,
-                         median5_GSWO, median6_GSWO, median7_GSWO, median8_GSWO,
-                         median9_GSWO, median10_GSWO,median11_GSWO)
-
-GSWO_median_table[order(GSWO_median_table$AIC), ] ## model 8 has lowest AIC, model 7 is nearly the same
-
-
-## glad
-median0_GLAD<- lm(median_lake_area ~ n_obs_median , data=glad)
-median1_GLAD<- lm(median_lake_area ~ n_obs_median + year + l8, data=glad)
-median2_GLAD<- lm(median_lake_area ~ n_obs_median + l8, data=glad)
-median3_GLAD<- lm(median_lake_area ~ n_obs_median + year, data=glad)
-median4_GLAD<- lm(median_lake_area ~ l8 + year, data=glad)
-median5_GLAD<- lm(median_lake_area ~ l8, data=glad)
-median6_GLAD<- lm(median_lake_area ~ n_obs_sum + year + l8, data=glad)
-median7_GLAD<- lm(median_lake_area ~ n_obs_sum + l8, data=glad)
-median8_GLAD<- lm(median_lake_area ~ n_obs_sum + year, data=glad)
-median9_GLAD<- lm(median_lake_area ~ l8 + year, data=glad)
-median10_GLAD<- lm(median_lake_area ~ l8, data=glad)
-median11_GLAD<- lm(median_lake_area ~ n_obs_sum, data=glad)
-
-GLAD_median_table <- AIC(median0_GLAD, median1_GLAD, median2_GLAD, median3_GLAD, median4_GLAD,
-                         median5_GLAD, median6_GLAD, median7_GLAD, median8_GLAD,
-                         median9_GLAD, median10_GLAD, median11_GLAD)
-
-GLAD_median_table[order(GLAD_median_table$AIC), ] ## median 7 is best; median 6 not much different
-
+select_model_aic <- function(data, response, obs_candidates = c("n_obs_sum", "n_obs_mean","n_obs_median"),label = "") {
+  specs <- list()
+  for (ov in obs_candidates) {
+    specs[[ov]]                <- ov            # obs only
+    specs[[paste0(ov, "+yr")]] <- c(ov, "year") # obs + year
+  }
+  fits <- lapply(specs, function(terms) lm(reformulate(terms, response), data = data))
+  aic  <- vapply(fits, AIC, numeric(1))
+  best <- names(which.min(aic))
+  m    <- fits[[best]]
+  cat(sprintf("%-32s best: %-16s AIC=%.1f (dAIC next=%.1f)\n",
+              label, best, min(aic), sort(aic)[2] - min(aic)))
+  attr(m, "obs_var")  <- specs[[best]][1]
+  attr(m, "has_year") <- "year" %in% specs[[best]]
+  m
+}
 #==========================
-# ===== Take best models and determine variance explained and % of maginitude
+# ===== table formatting helpers
 #==========================
+fmt_p <- function(p) ifelse(p < 0.01, "<0.01", sprintf("%.2f", p))
+fmt_coef <- function(x) ifelse(abs(x) < 1e-4 & x != 0,
+                               formatC(x, format = "e", digits = 2),
+                               as.character(signif(x, 2)))
+fmt_ci <- function(lo, hi) paste0("[", signif(lo, 2), ", ", signif(hi, 2), "]")
+# One model -> 3 rows (Observation frequency / Year / Entire model),
+# metrics as columns (coefficient / 95% CI / r-squared / p-value).
 
-### total area
-model2_GSWO<- lm(total_lake_area ~ n_obs_sum + l8, data=gswo)
-model2_GLAD<- lm(total_lake_area ~ n_obs_sum + l8, data=glad)
-
-## mean
-mean0_GSWO<- lm(mean_lake_area ~ n_obs_mean, data=gswo)
-mean1_GLAD<- lm(mean_lake_area ~ n_obs_sum + year + l8, data=glad)
-
-## median
-median11_GSWO<- lm(median_lake_area ~ n_obs_sum, data=gswo)
-median7_GLAD<- lm(median_lake_area ~ n_obs_sum + l8, data=glad)
-
-## function to extract partial R2 and coefficients
-analyze_model <- function(model, data, model_name = "model") {
+model_block <- function(data, response, dataset_label, tag) {
+  model   <- select_model_aic(data, response, label = paste(response, dataset_label, tag))
+  obs_var <- attr(model, "obs_var")
+  s       <- summary(model)
   coefs <- coef(model)
-  predictors <- names(coefs)[-1]  # exclude intercept
-  
-  # Extract summary info
-  model_summary <- summary(model)
-  coef_table <- model_summary$coefficients
-  
-  # Extract predictor p-values
-  p_values <- as.vector(coef_table[predictors, "Pr(>|t|)"])
-  
-  # Range of predictors
-  delta <- sapply(predictors, function(var) {
-    diff(range(data[[var]], na.rm = TRUE))
-  })
-  
-  # Contribution to predicted change
-  contrib <- coefs[predictors] * delta
-  total_change <- sum(contrib)
-  perc_contrib <- 100 * contrib / total_change
-  
-  # Model R-squared and p-value from F-stat
-  r2_total <- model_summary$r.squared
-  model_pval <- pf(model_summary$fstatistic[1],
-                   model_summary$fstatistic[2],
-                   model_summary$fstatistic[3],
-                   lower.tail = FALSE)
-  
-  # Partial r-squared
-  if (length(predictors) >= 2) {
-    relimp <- calc.relimp(model, type = "lmg", rela = FALSE)
-    r2_parts <- relimp$lmg[predictors]} else {
-    r2_parts <- r2_total
-    names(r2_parts) <- predictors}
-  
-  # Combine all
-  result <- data.frame(
-    model = model_name,
-    predictor = predictors,
-    coefficient = unname(coefs[predictors]),
-    p_value = unname(p_values),
-    delta_x = unname(delta),
-    contribution = unname(contrib),
-    percent_of_total = unname(perc_contrib),
-    partial_r2 = unname(r2_parts),
-    total_r2 = r2_total,
-    model_p_value = model_pval)
-  
-  return(result)
+  preds <- names(coefs)[-1]
+  ci    <- confint(model)
+  pv    <- setNames(s$coefficients[preds, "Pr(>|t|)"], preds)
+  r2_total <- s$r.squared
+  model_p  <- pf(s$fstatistic[1], s$fstatistic[2], s$fstatistic[3],
+                 lower.tail = FALSE)
+  r2p <- if (length(preds) >= 2)
+           calc.relimp(model, type = "lmg", rela = FALSE)$lmg[preds]
+         else setNames(r2_total, preds)
+  term_row <- function(var) {
+    if (!var %in% preds) return(c(coef = "-", ci = "-", r2 = "-", p = "-"))
+    c(coef = unname(fmt_coef(coefs[var])),
+      ci   = unname(fmt_ci(ci[var, 1], ci[var, 2])),
+      r2   = unname(sprintf("%.2f", r2p[var])),
+      p    = unname(fmt_p(pv[var])))
+  }
+  obs <- term_row(obs_var); yr <- term_row("year")
+  tibble(
+    Dataset     = c(dataset_label, "", ""),
+    Term        = c(paste0("Observation frequency (", obs_var, ")"),
+                    "Year", "Entire model"),
+    Coefficient = c(obs["coef"], yr["coef"], "-"),
+    `95% CI`    = c(obs["ci"],   yr["ci"],   "-"),
+    `r-squared` = c(obs["r2"],   yr["r2"],   sprintf("%.2f", r2_total)),
+    `p-value`   = c(obs["p"],    yr["p"],    fmt_p(model_p))
+  )
 }
-
-explained_df <- bind_rows(
-  analyze_model(model2_GSWO, gswo, "total_GSWO"),
-  analyze_model(model2_GLAD, glad, "total_GLAD"),
-  analyze_model(mean0_GSWO, gswo, "mean_GSWO"),
-  analyze_model(mean1_GLAD, glad, "mean_GLAD"),
-  analyze_model(median11_GSWO, gswo, "median_GSWO"),
-  analyze_model(median7_GLAD, glad, "median_GLAD"))%>%
-  separate(model, into = c("model", "dataset"), sep = "_") %>%
-  filter(predictor != "(Intercept)") %>% 
-  #select(model, dataset, predictor, percent_of_total, partial_r2, total_r2) %>% 
-  arrange(dataset, model)
-
-#==========================
-# ===== Now make a table to print/add to excel spreadsheet
-#==========================
-create_summary_table <- function(model, data, model_name = "model") {
-  df <- analyze_model(model, data, model_name)
-  
-  # Pull total r_squared and model p-value from model
-  total_r2 <- unique(df$total_r2)
-  model_pval <- unique(df$model_p_value)
-  
-  # Extract only the rows we want
-  metric_names <- c("p_value", "r_squared", "coefficient", "percent_of_total")
-  
-  # Add r_squared, select relevant columns
-  df <- df %>% mutate(r_squared = partial_r2) %>%
-    dplyr::select(predictor, coefficient, p_value, percent_of_total, r_squared)
-  
-  # Build long form table
-  long_df <- purrr::map_dfr(metric_names, function(metric) {df %>% dplyr::select(predictor, !!sym(metric)) %>%
-      rename(value = !!sym(metric)) %>%
-      mutate(metric = metric)}) %>%
-    dplyr::select(metric, predictor, value)
-  
-  # Pivot to wide format
-  table <- long_df %>%
-    tidyr::pivot_wider(names_from = predictor, values_from = value)
-  
-  # Reorder columns: metric, year, ..., whole model
-  predictor_cols <- colnames(table)
-  ordered_cols <- c(
-    "metric",
-    intersect("year", predictor_cols),                          
-    setdiff(predictor_cols, c("metric", "year", "whole model")),
-    intersect("whole model", predictor_cols))
-  
-  table <- table[, ordered_cols]
-  
-  # Insert whole model stats
-  table <- table %>%
-    mutate(`whole model` = case_when(
-      metric == "p_value"    ~ model_pval,
-      metric == "r_squared" ~ total_r2,
-      TRUE ~ NA_real_
-    ))
-  
-  # Add model label and spacer
-  header <- tibble::tibble(metric = model_name)
-  spacer <- tibble::tibble(metric = "")
-  
-  dplyr::bind_rows(header, table, spacer)
+section_header <- function(label) {
+  tibble(Dataset = label, Term = "", Coefficient = "",
+         `95% CI` = "", `r-squared` = "", `p-value` = "")
 }
-
+#==========================
+# ===== build the summary table
+#==========================
 summary_table <- bind_rows(
-  create_summary_table(model2_GSWO, gswo, "total_GSWO"),
-  create_summary_table(model2_GLAD, glad, "total_GLAD"),
-  create_summary_table(mean0_GSWO, gswo, "mean_GSWO"),
-  create_summary_table(mean1_GLAD, glad, "mean_GLAD"),
-  create_summary_table(median11_GSWO, gswo, "median_GSWO"),
-  create_summary_table(median7_GLAD, glad, "median_GLAD"))
+  section_header("Total lake area - all lakes"),
+  model_block(gswo,   "total_lake_area",  "GSWO", "all"),
+  model_block(glad,   "total_lake_area",  "GLAD", "all"),
+  section_header("Total lake area - complete-record lakes"),
+  model_block(gswo_c, "total_lake_area",  "GSWO", "complete"),
+  model_block(glad_c, "total_lake_area",  "GLAD", "complete"),
+  section_header("Mean lake area - all lakes"),
+  model_block(gswo,   "mean_lake_area",   "GSWO", "all"),
+  model_block(glad,   "mean_lake_area",   "GLAD", "all"),
+  section_header("Mean lake area - complete-record lakes"),
+  model_block(gswo_c, "mean_lake_area",   "GSWO", "complete"),
+  model_block(glad_c, "mean_lake_area",   "GLAD", "complete"),
+  section_header("Median lake area - all lakes"),
+  model_block(gswo,   "median_lake_area", "GSWO", "all"),
+  model_block(glad,   "median_lake_area", "GLAD", "all"),
+  section_header("Median lake area - complete-record lakes"),
+  model_block(gswo_c, "median_lake_area", "GSWO", "complete"),
+  model_block(glad_c, "median_lake_area", "GLAD", "complete")
+)
+
+write.csv(summary_table,
+           file.path("lake_area_model_summary_table.csv"),
+           row.names = FALSE, na = "")
 
 #==========================
-# ===== Models to state there is no temporal trend
+#   For each response x dataset x subset we take the obs variable selected by
+#   AIC and report:
+#     cor_obs_year = Pearson r between year and that obs variable
+#     VIF          = variance inflation factor for the 2-predictor
 #==========================
+collinearity_diag <- function(data, response, dataset_label, subset_label) {
+  m       <- select_model_aic(data, response,
+                             label = paste(response, dataset_label, subset_label))
+  obs_var <- attr(m, "obs_var")
+  r       <- cor(data[[obs_var]], data$year, use = "complete.obs")
+  data.frame(
+    response     = response,
+    dataset      = dataset_label,
+    subset       = subset_label,
+    obs_var      = obs_var,
+    cor_obs_year = round(r, 3),
+    VIF          = round(1 / (1 - r^2), 2)   # 2-predictor VIF = 1 / (1 - r^2)
+  )
+}
+collinearity <- bind_rows(
+  collinearity_diag(gswo,   "total_lake_area",  "GSWO", "all"),
+  collinearity_diag(glad,   "total_lake_area",  "GLAD", "all"),
+  collinearity_diag(gswo_c, "total_lake_area",  "GSWO", "complete"),
+  collinearity_diag(glad_c, "total_lake_area",  "GLAD", "complete"),
+  collinearity_diag(gswo,   "mean_lake_area",   "GSWO", "all"),
+  collinearity_diag(glad,   "mean_lake_area",   "GLAD", "all"),
+  collinearity_diag(gswo_c, "mean_lake_area",   "GSWO", "complete"),
+  collinearity_diag(glad_c, "mean_lake_area",   "GLAD", "complete"),
+  collinearity_diag(gswo,   "median_lake_area", "GSWO", "all"),
+  collinearity_diag(glad,   "median_lake_area", "GLAD", "all"),
+  collinearity_diag(gswo_c, "median_lake_area", "GSWO", "complete"),
+  collinearity_diag(glad_c, "median_lake_area", "GLAD", "complete")
+)
 
-### total area
-total_GSWO<- lm(total_lake_area ~ n_obs_sum + l8 + year, data=gswo)
-total_GLAD<- lm(total_lake_area ~ n_obs_sum + l8 + year, data=glad)
-
-## mean
-mean_GSWO<- lm(mean_lake_area ~ n_obs_mean+ year + l8, data=gswo)
-mean_GLAD<- lm(mean_lake_area ~ n_obs_sum + year + l8, data=glad)
-
-## median
-median_GSWO<- lm(median_lake_area ~ n_obs_sum + year + l8, data=gswo)
-median_GLAD<- lm(median_lake_area ~ n_obs_sum + l8 + year, data=glad)
-
-get_year_pvalue <- function(model, model_name = "model") {
-  coefs <- summary(model)$coefficients
-  if ("year" %in% rownames(coefs)) {
-    pval <- coefs["year", "Pr(>|t|)"]} else {pval <- NA }
-  data.frame(model = model_name, p_value_year = pval)}
-
-year_pvals <- bind_rows(
-  get_year_pvalue(total_GSWO, "total_GSWO"),
-  get_year_pvalue(total_GLAD, "total_GLAD"),
-  get_year_pvalue(mean_GSWO,  "mean_GSWO"),
-  get_year_pvalue(mean_GLAD,  "mean_GLAD"),
-  get_year_pvalue(median_GSWO,"median_GSWO"),
-  get_year_pvalue(median_GLAD,"median_GLAD"))
-
-print(year_pvals)
-
-
+print(collinearity, row.names = FALSE)
