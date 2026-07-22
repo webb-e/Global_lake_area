@@ -2,9 +2,9 @@
 ### This code takes the global total, mean, and median annual lake areas 
 ### and produces a global figure of the trends of these variables over time as well as
 ### how they relate to observation frequency.
-### There is a seperate file that makes the same figure, but by climate_zone
+### There is a separate file that makes the same figure, but by climate_zone
 ###
-### Last updated Sept 24, 2025 by E. Webb
+### Last updated July 2026 by E. Webb
 ########
 
 library(arrow)
@@ -148,26 +148,25 @@ data %>% filter(climate_zone=='Global')%>%  group_by(dataset) %>%summarise(
           select (total_change, mean_change, median_change,dataset)
 
 
-###  average total, mean and median lake area was X, y, and z% 
-###  higher post-2013 relative to the pre-2013 average
+#### on average, the global total lake area increased by X% 
+#### while the mean and median lake area increased by x and  y %
 
-dat_gswo$l8<-ifelse(dat_gswo$year<2013, 'pre', 'post')
-dat_glad$l8<-ifelse(dat_glad$year<2013, 'pre', 'post')
-dat_gswo %>%group_by(l8) %>%
-  summarise(avg_median_water_median = mean(median_water_median),
-    avg_median_water_mean = mean(median_water_mean),
-    avg_median_water_sum = mean(median_water_sum),.groups = 'drop') %>%
-  summarise(median_increase = (avg_median_water_median[l8 == "post"] - avg_median_water_median[l8 == "pre"]) / avg_median_water_median[l8 == "pre"] * 100,
-    mean_increase = (avg_median_water_mean[l8 == "post"] - avg_median_water_mean[l8 == "pre"]) / avg_median_water_mean[l8 == "pre"] * 100,
-    sum_increase = (avg_median_water_sum[l8 == "post"] - avg_median_water_sum[l8 == "pre"]) / avg_median_water_sum[l8 == "pre"] * 100)
-
-dat_glad %>%group_by(l8) %>%
-  summarise(avg_median_water_median = mean(median_water_median),
-            avg_median_water_mean = mean(median_water_mean),
-            avg_median_water_sum = mean(median_water_sum),.groups = 'drop') %>%
-  summarise(median_increase = (avg_median_water_median[l8 == "post"] - avg_median_water_median[l8 == "pre"]) / avg_median_water_median[l8 == "pre"] * 100,
-            mean_increase = (avg_median_water_mean[l8 == "post"] - avg_median_water_mean[l8 == "pre"]) / avg_median_water_mean[l8 == "pre"] * 100,
-            sum_increase = (avg_median_water_sum[l8 == "post"] - avg_median_water_sum[l8 == "pre"]) / avg_median_water_sum[l8 == "pre"] * 100)
+data %>% filter(climate_zone == "Global") %>%
+  group_by(dataset) %>%
+  summarise(
+    first_year = min(year),
+    last_year  = max(year),
+    first_total_lake_area   = total_lake_area[year == first_year],
+    last_total_lake_area    = total_lake_area[year == last_year],
+    first_mean_lake_area    = mean_lake_area[year == first_year],
+    last_mean_lake_area     = mean_lake_area[year == last_year],
+    first_median_lake_area  = median_lake_area[year == first_year],
+    last_median_lake_area   = median_lake_area[year == last_year]) %>%
+  mutate(
+    total_change  = (last_total_lake_area - first_total_lake_area) / first_total_lake_area * 100,
+    mean_change   = (last_mean_lake_area - first_mean_lake_area) / first_mean_lake_area * 100,
+    median_change = (last_median_lake_area - first_median_lake_area) / first_median_lake_area * 100) %>%
+  dplyr::select(total_change, mean_change, median_change, dataset)
 
 #==========================
 # ===== quick count of the number of lakes  
@@ -177,7 +176,7 @@ glad_dt[, uniqueN(lake_id)]
 
 
 #==========================
-# ===== Generate ED Table 2
+# ===== Generate Table 2
 #==========================
 #####   the total, mean, and median lake area were strongly correlated with observation frequency
 
@@ -239,7 +238,7 @@ correlation_table <- results_df %>%
 
 
 #==========================
-# ===== Generate ED Table 1
+# ===== Generate Table 1
 #==========================
 ###   Total, mean, and median global lake area derived from the GSWO and GLAD
 ###   surface water products increased over the 23-year record 
@@ -339,3 +338,5 @@ kendall_detailed <- kendall_results %>%
       TRUE ~ "CI not available"
     )
   )
+
+
