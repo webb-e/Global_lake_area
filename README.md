@@ -9,11 +9,9 @@ This repository is organized into folders as follows:
 * calculate the monthly median lake area of each lake
 
 `Analysis` contains the code used to:
- * calculate globally aggregated lake area trends and quantify the relationship between aggregated lake area and observation frquency and the launch of Landsat 8
-* estimate area trends for individual lakes 
+ * calculate globally aggregated lake area trends and quantify the relationship between aggregated lake area and observation frquency 
 * culster months into wet and dry seasons and calculate the proportion of observations that come from wet/dry seasons annually
 * quantify the relationship between observation frequency and in the proportion of observations that come from wet seasons
-* perform the breakpoint analysis
 
 `Figures` contains the code used to produce the figures
 
