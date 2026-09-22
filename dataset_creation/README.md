@@ -1,4 +1,4 @@
-`extract_lake_area.py` extracts lake area for every lake within the Prior Lakes Database (PLD) for the period 1999-2021 for both the GSWO and GLAD datasets.
+`extract_lake_area.py` extracts lake area for every lake within the Prior Lakes Database (PLD) for the period 1999-2021 for both the GSWO ("JRC/GSW1_4/MonthlyHistory")  and GLAD (asset ID: 'projects/glad/water/C2/individualMonths') datasets.
 
 `area_csvs_to_parquets.R` collates the csvs ouptut from extract_lake_area.py and creates collated .parquet files of the lake area timeseries.
 
