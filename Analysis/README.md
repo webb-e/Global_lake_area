@@ -1,3 +1,5 @@
+`buffer_sensitivity.R` recomputes aggregated lake area model results for 100,000 lakes randomly selected from the set of lakes that were observed in every year at varying buffer distances.
+
 `compute_observationfrequency.R` calculates per-lake observation frequency by climate zone, percent increase in observation frequency, and trends in observation frequency over time.
 
 `global_over_time.R` produces basic statistics on how aggregated annual lake area relates to observation frequency and data collected post-2013
