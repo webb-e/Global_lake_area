@@ -8,6 +8,8 @@
 # Reads the CSVs written by lake_area_models_all_methods.R:
 #   {method}_all_lakes_obs-sum.csv, {method}_by_size_obs-sum.csv,
 #   {method}_by_zone_obs-sum.csv
+#
+# Last updated by E. Webb Oct 2026
 #==============================================================================
 
 library(data.table)
@@ -19,7 +21,7 @@ library(grid)
 #==========================
 # ===== settings
 #==========================
-csv_dir   <- '/Users/elizabethwebb/Library/CloudStorage/Box-Box/Landsat8/csvs'
+csv_dir   <- '..'
 RESP_PLOT <- "mean"          # "total", "mean", or "median"
 size_brks <- switch(RESP_PLOT,
                     total  = c(-25, -10, -5, 0, 5, 10, 50, 100),
@@ -134,6 +136,6 @@ fig <- wrap_plots(A = y_lab, B = row_size, C = x_size, D = row_zone, E = x_zone,
   plot_layout(widths = c(0.06, 1), heights = c(1, 0.12, 1, 0.12), guides = "collect") &
   theme(legend.position = "bottom")
 
-ggsave(file.path("/Users/elizabethwebb/Library/CloudStorage/Box-Box/Landsat8/figures/",
+ggsave(file.path("...",
                  sprintf("%s_coefficients.png", RESP_PLOT)), fig, width = 30, height = 20, dpi = 300)
 
