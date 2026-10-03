@@ -16,12 +16,15 @@ library(EnvStats)
 #==========================
 # ===== read in files
 #==========================
-parquet_path <- "/Users/elizabethwebb/Library/CloudStorage/Box-Box/Landsat8/annual_lake_medians_dataset"
-parquet_files <- list.files(parquet_path, pattern = "\\.parquet$", full.names = TRUE, recursive = TRUE)
+parquet_path <- "annual_lake_medians_dataset"
+parquet_files <- list.files(parquet_path, pattern = "^[^.].*\\.parquet$", full.names = TRUE, recursive = TRUE)
+YEARS <- 1999:2021
 
+# observation frequency is summarised over ALL lakes (lakes with no valid
+# observations in a year count as 0); lake area summaries drop NA areas
 read_filtered <- function(path, ds_name) {
   open_dataset(path) %>%
-    filter(dataset == ds_name) %>%
+    filter(dataset == ds_name, year >= !!min(YEARS), year <= !!max(YEARS)) %>%
     collect() %>%
     as.data.table()
 }
@@ -67,12 +70,13 @@ sci_expr <- function(x) {
 }
 
 ### label placement: GSWO stacked in upper left, GLAD stacked in lower right
-
+### positions are set as a fraction of each panel (npc) and converted to data units,
+### so every line is spaced the same regardless of superscripts
 step <- 0.11   # vertical spacing between stacked lines (fraction of panel height)
 
 npc_to_data <- function(v, npc) {
   r  <- range(v, na.rm = TRUE)
-  lo <- r[1] - 0.05 * diff(r)   
+  lo <- r[1] - 0.05 * diff(r)   # ggplot default 5% expansion
   hi <- r[2] + 0.05 * diff(r)
   lo + npc * (hi - lo)
 }
@@ -131,12 +135,36 @@ cor_lines <- place_lines(cor_lab[, .(
   xvar = list(total_lake_area = "n_obs_sum", mean_lake_area = "n_obs_mean", median_lake_area = "n_obs_median"))
 
 #==========================
+# ===== percent change over the record (same scaling as Figure 2)
+#   trend    : Theil-Sen slope x record length / 1999-2021 average
+#   step     : post-2013 mean minus pre-2013 mean, relative to the
+#              pre-2013 mean (pct_step_pre) or 1999-2021 average (pct_step_avg)
+#==========================
+REC_LEN <- max(YEARS) - min(YEARS)
+
+avg_dt <- melt(df[, lapply(.SD, mean), by = dataset, .SDcols = vars_to_melt],
+               id.vars = "dataset", variable.name = "metric", value.name = "avg")
+avg_dt[, metric := as.character(metric)]
+
+pct_trend <- merge(trend_lab, avg_dt, by = c("dataset", "metric"))
+pct_trend[, pct_change := 100 * slope * REC_LEN / avg]
+print(pct_trend[, .(dataset, metric, pct_change = round(pct_change, 1), p = signif(p, 2))])
+
+step_dt <- plot_dt[, .(pre  = mean(value[year <  2013]),
+                       post = mean(value[year >= 2013]),
+                       avg  = mean(value)),
+                   by = .(dataset, metric)]
+step_dt[, `:=`(pct_step_pre = round(100 * (post - pre) / pre, 1),
+               pct_step_avg = round(100 * (post - pre) / avg, 1))]
+print(step_dt)
+
+#==========================
 # ===== Plots!
 #==========================
 basesize  = 30
 pointsize = 5
 textsize  = 30
-labsize   = 6.5    
+labsize   = 6.5    # label text size (mm)
 
 stat_label <- function(lab) {
   geom_text(data = lab, aes(x = x, y = y, label =paste0('bold(', line, ' * vphantom(p^"1"))'), color = dataset, hjust = hj),
@@ -292,8 +320,10 @@ final_plot <- (LT + MT + RT) / (LM + MM + RM) / (LB + MB + RB) +
         legend.justification = "center",
         legend.text = element_text(size = textsize * 0.9))
 
-ggsave(file.path(" ",
-                 "Fig1.png"), final_plot, width = 20, height = 14, dpi = 300)
+final_plot
+
+ggsave(file.path("..",
+                 "fig1.png"), final_plot, width = 20, height = 14, dpi = 300)
 
 
 
