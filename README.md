@@ -1,4 +1,4 @@
-Code to accompany the Perspective <i>Neglecting observation frequency biases Landsat-derived surface water trends</i>
+Code to accompany the Perspective <i>Neglecting changes in data acquisition biases Landsat-derived surface water trends</i>
 
 This repository is organized into folders as follows:
 
