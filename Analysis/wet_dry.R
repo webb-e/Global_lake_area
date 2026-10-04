@@ -14,12 +14,12 @@ library(dplyr)
 ########
 ### Paths
 #########
-parquet_path <- "/Volumes/EW_external/Global_landsat/lake_area_parquets/"
-output_dir   <- '/Volumes/EW_external/Global_landsat/seasonal_dataset/'
-climate_path <- "/Volumes/EW_external/Postdoc_Duke/Landsat8/annual_lake_medians_dataset/"
+parquet_path <- "lake_area_parquets/"
+output_dir   <- 'seasonal_dataset/'
+climate_path <- "annual_lake_medians_dataset/"
 
 dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
-results_out <- "/Users/elizabethwebb/Library/CloudStorage/Box-Box/Landsat8/csvs"
+results_out <- "Landsat8/csvs"
 
 ########
 ### Settings
