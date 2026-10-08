@@ -112,8 +112,18 @@ print(stats[zone != "Global" & type == "lake area",
 #==========================
 # ===== formatting helpers
 #==========================
-fmt_p     <- function(p) ifelse(p < 0.001, "<0.001",
-                                formatC(round(p, 3), format = "f", digits = 3, drop0trailing = TRUE))
+fmt_p <- function(p) {
+  sup <- c("0" = "\u2070", "1" = "\u00b9", "2" = "\u00b2", "3" = "\u00b3", "4" = "\u2074",
+           "5" = "\u2075", "6" = "\u2076", "7" = "\u2077", "8" = "\u2078", "9" = "\u2079",
+           "-" = "\u207b")
+  vapply(p, function(x) {
+    if (x >= 0.001) return(formatC(signif(x, 2), format = "fg", digits = 2))
+    e <- floor(log10(x)); m <- round(x / 10^e, 1)
+    if (m >= 10) { m <- m / 10; e <- e + 1 }
+    paste0(sprintf("%.1f", m), " \u00d7 10",
+           paste(sup[strsplit(as.character(e), "")[[1]]], collapse = ""))
+  }, character(1))
+}
 fmt_slope <- function(x) ifelse(abs(x) >= 100,
                                 formatC(round(x), format = "d", big.mark = ""),
                                 formatC(round(x, 4), format = "f", digits = 4, drop0trailing = TRUE))
